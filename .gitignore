@@ -1,0 +1,8 @@
+build
+.gradle
+client/build
+client/out
+enclave/build
+host/build
+hello-world.*
+jdk-8u221-linux-x64.tar.gz
