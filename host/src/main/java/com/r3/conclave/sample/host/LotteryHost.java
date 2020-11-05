@@ -19,6 +19,9 @@ import java.nio.charset.StandardCharsets;
  */
 public class LotteryHost {
     public static void main(String[] args) throws EnclaveLoadException, IOException {
+        final String enclaveClassName = "com.example.conclave.LotteryEnclave";
+        System.out.println("Initializing LotteryHost");
+
         // Report whether the platform supports hardware enclaves.
         try {
             EnclaveHost.checkPlatformSupportsEnclaves(true);
@@ -29,18 +32,18 @@ public class LotteryHost {
 
         // Let's open a TCP socket and implement a trivial protocol that lets a remote client use it.
         int port = 9999;
-        System.out.println("Listening on port " + port + ". Use the client app to send strings for reversal.");
+        System.out.println("Listening on port " + port + ". Use the client app to request for lottery numbers.");
         ServerSocket acceptor = new ServerSocket(port);
         Socket connection = acceptor.accept();
 
-        // Just send the attestation straight to whoever connects. It's signed so that is MITM-safe.
+        // Create a output stream to communicate with the client
         DataOutputStream output = new DataOutputStream(connection.getOutputStream());
 
         // We start by loading the enclave using EnclaveHost, and passing the class name of the Enclave subclass
-        // that we defined in our enclave module. This will start the sub-JVM and initialise the class in that, i.e.
-        // the ReverseEnclave class is not instantiated in this JVM.
-        EnclaveHost enclave = EnclaveHost.load("com.example.conclave.LotteryEnclave");
+        // that we defined in our enclave module. This will start the sub-JVM and initialise the Enclave subclass
+        EnclaveHost enclave = EnclaveHost.load(enclaveClassName);
 
+        // SPID & Attestation keys required for non-simulation modes
         if (enclave.getEnclaveMode() != EnclaveMode.SIMULATION && args.length != 2) {
             throw new IllegalArgumentException("You need to provide the SPID and attestation key as arguments for " +
                     enclave.getEnclaveMode() + " mode.");
@@ -67,19 +70,25 @@ public class LotteryHost {
         final byte[] attestationBytes = attestation.serialize();
         // It has a useful toString method.
         System.out.println(EnclaveInstanceInfo.deserialize(attestationBytes));
+        // Just send the attestation straight to the client. It's signed so that is MITM-safe.
         sendArray(output, attestationBytes);
 
-        // READ LOTTERY NUMBER FROM CLIENT
+        // Lottery Application
+        // The client will request the enclave to register 6-digit lottery numbers of its choosing
+        // We read the encrypted numbers via the socket connection
         for(int i=0;i<5;i++){
             DataInputStream input = new DataInputStream(connection.getInputStream());
             byte[] mailBytes = new byte[input.readInt()];
             input.readFully(mailBytes);
-            // Deliver it. The enclave will give us the encrypted reply in the callback we provided above, which
-            // will then send the reply to the client.
+            // Deliver the data to the enclave.
+            // The enclave will give us the encrypted reply in the callback we provided to enclave.start function
             enclave.deliverMail(1, mailBytes);
         }
 
-        // HOST TELLS ENCLAVE TO DECLARE LOTTERY
+        // Lottery numbers allocation is complete, now its time to draw a winner
+        // This example requires the host to send a "DECLARE" command to calcuate the winner to the enclave
+        // This could also be sent by a client, e.g. The lottery commission
+
         System.out.println();
         final Charset utf8 = StandardCharsets.UTF_8;
         byte[] winningLotteryBytes = enclave.callEnclave("DECLARE".getBytes(utf8));
@@ -87,7 +96,6 @@ public class LotteryHost {
         System.out.println("[Host] Declaring Lottery!: " + winningLottery);
         System.out.println();
 
-//        sendArray(output, winningLotteryBytes);
         // Closing the output stream closes the connection. Different clients will block each other but this
         // is just a hello world sample.
         output.close();
