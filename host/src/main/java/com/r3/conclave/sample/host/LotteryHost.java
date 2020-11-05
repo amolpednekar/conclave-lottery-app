@@ -39,7 +39,7 @@ public class LotteryHost {
         // We start by loading the enclave using EnclaveHost, and passing the class name of the Enclave subclass
         // that we defined in our enclave module. This will start the sub-JVM and initialise the class in that, i.e.
         // the ReverseEnclave class is not instantiated in this JVM.
-        EnclaveHost enclave = EnclaveHost.load("com.psl.conclave.LotteryEnclave");
+        EnclaveHost enclave = EnclaveHost.load("com.example.conclave.LotteryEnclave");
 
         if (enclave.getEnclaveMode() != EnclaveMode.SIMULATION && args.length != 2) {
             throw new IllegalArgumentException("You need to provide the SPID and attestation key as arguments for " +
