@@ -9,8 +9,9 @@ import kotlin.math.floor
 
 class LotteryEnclave : Enclave(), EnclaveCall {
 
+    // Keep track of lotteries
     private val lotteryBook = mutableSetOf<Int>()
-    private var result: String? = null
+    private lateinit var result: String
     lateinit var clientPublicKey: PublicKey
 
     override fun invoke(input: ByteArray): ByteArray? {
@@ -19,13 +20,13 @@ class LotteryEnclave : Enclave(), EnclaveCall {
         result = if (lotteryBook.isNotEmpty()) {
             lotteryBook.elementAt(floor(Math.random() * lotteryBook.size).toInt()).toString()
         } else {
-            "Lottery empty"
+            "Draw not possible: No lotteries were used."
         }
         // Reply to client(s) about the result
-        val replyToClient = createMail(clientPublicKey, result!!.toByteArray())
+        val replyToClient = createMail(clientPublicKey, result.toByteArray())
         postMail(replyToClient, null)
         // Tell the host too
-        return result!!.toByteArray()
+        return result.toByteArray()
     }
 
     override fun receiveMail(id: EnclaveMailId, mail: EnclaveMail) {
@@ -35,7 +36,7 @@ class LotteryEnclave : Enclave(), EnclaveCall {
         require(lotteryArgs.size == 2) { "Lottery args are incorrect " }
 
         val response: String
-        // Check if it client is registering a vote or asking for the result
+        // Check if it client is registering a vote
         if (lotteryArgs[0] == "BUY") {
             // Require the lottery number to be 6 digit
             require(lotteryArgs[1].matches(Regex("[1234567890]{6}")))
@@ -43,24 +44,11 @@ class LotteryEnclave : Enclave(), EnclaveCall {
             // Try to add the number to the lottery book
             val number = lotteryArgs[1].toInt()
             if (lotteryBook.contains(number)) {
-                response = "Choose a different number"
-                // Create and send back the mail with the same topic as the sender used.
-
+                response = "Lottery number $number already selected."
             } else {
-                response = "Lottery booked!"
+                response = "Lottery number registered."
                 lotteryBook.add(lotteryArgs[1].toInt())
             }
-            val reply = createMail(clientPublicKey, response.toByteArray())
-            postMail(reply, null)
-            return
-        }
-        if (lotteryArgs[0] == "RESULT") {
-            response = result ?: "Results not declared"
-            val reply = createMail(clientPublicKey, response.toByteArray())
-            postMail(reply, null)
-            return
-        } else {
-            response = "Invalid input"
             val reply = createMail(clientPublicKey, response.toByteArray())
             postMail(reply, null)
             return
