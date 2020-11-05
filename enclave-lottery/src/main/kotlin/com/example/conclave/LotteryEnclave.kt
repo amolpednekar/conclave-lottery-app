@@ -1,4 +1,4 @@
-package com.psl.conclave
+package com.example.conclave
 
 import com.r3.conclave.common.EnclaveCall
 import com.r3.conclave.enclave.Enclave
